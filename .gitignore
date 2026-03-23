@@ -1,0 +1,16 @@
+node_modules/
+.tmp/
+dist/
+*.vsix
+*.zip
+.DS_Store
+
+apps/**/node_modules/
+apps/**/dist/
+apps/**/.tmp/
+apps/**/.env
+
+packages/**/node_modules/
+packages/**/dist/
+
+skills/**/.env

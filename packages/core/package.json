@@ -1,0 +1,11 @@
+{
+  "name": "@x-article/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@x-article/shared-types": "workspace:*",
+    "gray-matter": "^4.0.3"
+  }
+}

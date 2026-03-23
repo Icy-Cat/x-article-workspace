@@ -1,0 +1,113 @@
+{
+  "name": "x-article-vscode",
+  "displayName": "X Article in VS Code",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Preview the current Markdown document in an X Article-style sidebar and publish it through Playwright MCP.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Icy-Cat/x-article-in-obsidian.git"
+  },
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:xArticle.openPreview",
+    "onView:xArticle.preview"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "xArticle.openPreview", "title": "X Article: Open Preview" },
+      { "command": "xArticle.refreshPreview", "title": "X Article: Refresh Preview" },
+      { "command": "xArticle.copyPublishScript", "title": "X Article: Copy Publish Script" },
+      { "command": "xArticle.publishViaMcp", "title": "X Article: Publish Through Browser" },
+      { "command": "xArticle.openGuide", "title": "X Article: Open Quick Start Guide" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "xArticle", "title": "X Article", "icon": "resources/newspaper.svg" }
+      ]
+    },
+    "views": {
+      "xArticle": [
+        { "id": "xArticle.preview", "name": "Preview", "type": "webview" }
+      ]
+    },
+    "configuration": {
+      "title": "X Article",
+      "properties": {
+        "xArticle.locale": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "en", "zh-CN"],
+          "description": "Choose the language for the extension UI."
+        },
+        "xArticle.playwrightToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional PLAYWRIGHT_MCP_EXTENSION_TOKEN used for browser publishing."
+        },
+        "xArticle.enableDebugLog": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write local debug logs for browser publishing."
+        },
+        "xArticle.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the preview when the active markdown editor changes."
+        },
+        "xArticle.autoApplyCover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically click Apply after uploading the cover image during browser publishing."
+        },
+        "xArticle.stripFrontmatter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide YAML frontmatter from the preview output."
+        },
+        "xArticle.useFilenameAsTitle": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use the filename as the title when the document has no H1."
+        },
+        "xArticle.showDraftNotice": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a local-only draft notice above the article body."
+        },
+        "xArticle.showWelcomeGuide": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the welcome guide once after activation."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && node ./scripts/build.mjs",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "package": "pnpm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@x-article/core": "workspace:*",
+    "@x-article/i18n": "workspace:*",
+    "@x-article/publish": "workspace:*",
+    "@x-article/shared-types": "workspace:*",
+    "cheerio": "^1.1.0",
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
+    "@types/node": "^22.14.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/vscode": "^1.95.0",
+    "esbuild": "^0.25.1",
+    "typescript": "^5.8.3",
+    "vscode": "^1.1.37"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "x-article-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "build": "pnpm -C apps/vscode build",
+    "build:vscode": "pnpm -C apps/vscode build",
+    "lint": "pnpm -C apps/vscode lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
