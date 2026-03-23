@@ -38,7 +38,7 @@ const EXTENSION_ID  = 'mmlmfjhmonkocbjadbfplnigmagldckm';
 const TOKEN_RE      = /([A-Za-z0-9_-]{40,50})/;
 const SKILL_DIR     = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOT_ENV_PATH  = join(SKILL_DIR, '.env');
-const WORKSPACE_DIR = 'G:\\Projects\\0Tools\\x-article-workspace';
+const WORKSPACE_DIR = resolve(SKILL_DIR, '..', '..');
 const SHARED_TEMPLATE_PATH = join(WORKSPACE_DIR, 'packages', 'publish', 'src', 'template.ts');
 const JITI_PATH = join(WORKSPACE_DIR, 'apps', 'obsidian', 'node_modules', 'jiti');
 
@@ -236,7 +236,7 @@ try {
     throw new Error('Editor did not become ready after clicking Create.');
   }`);
 
-  console.log('✍️   Publishing via shared workspace browser template...');
+  console.log('✍️   Publishing via shared browser template...');
   const publishResult = await client.evaluate(buildSharedWorkspaceBrowserPublishFunction(payload));
   if (!publishResult?.ok) {
     throw new Error(`Shared publish failed: ${JSON.stringify(publishResult)}`);
@@ -265,7 +265,7 @@ function buildSharedWorkspaceBrowserPublishFunction(payload) {
       throw new Error(`Shared browser template not found: ${SHARED_TEMPLATE_PATH}`);
     }
     if (!existsSync(JITI_PATH)) {
-      throw new Error(`jiti not found for workspace import: ${JITI_PATH}`);
+      throw new Error(`jiti not found for shared template import: ${JITI_PATH}`);
     }
     const require = createRequire(import.meta.url);
     const { createJiti } = require(JITI_PATH);

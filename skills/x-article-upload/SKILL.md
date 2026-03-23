@@ -5,11 +5,9 @@ description: Upload a local Markdown (.md) file to X (Twitter/X.com) as an artic
 
 # X Article Upload Skill
 
-Source of truth for this skill now lives in:
+This directory is the maintained source for the Claude Code upload skill.
 
-`G:\Projects\0Tools\x-article-workspace\skills\x-article-upload`
-
-The local Claude skill directory can keep a thin wrapper for compatibility, but future maintenance should happen in the workspace copy first.
+If a local Claude skill directory is used as a compatibility wrapper, keep implementation changes in this workspace copy and let the wrapper forward execution here.
 
 Upload a local Markdown file to X (Twitter) article draft editor in one shot:
 detect token → spawn playwright MCP via npx → navigate → inject content — no manual steps.
