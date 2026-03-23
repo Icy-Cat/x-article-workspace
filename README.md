@@ -46,8 +46,10 @@ pnpm -C apps/vscode package
 - Main script:
 
 ```bash
-node "G:\Projects\0Tools\x-article-workspace\skills\x-article-upload\scripts\upload-article.mjs" "<absolute-path-to-file.md>"
+node "skills/x-article-upload/scripts/upload-article.mjs" "<absolute-path-to-file.md>"
 ```
+
+- If a local Claude skill wrapper exists, it can forward to this workspace copy.
 
 ## Goals
 
