@@ -40,7 +40,48 @@ If you only want the Obsidian plugin release-facing docs, use `G:\Projects\0Tool
 - Developing local upload automation next to host integrations
 - Using one workspace as the main source of truth for ongoing feature work
 
+## Usage
+
+This workspace is mainly used in three ways:
+
+### 1. Use the VS Code extension
+
+If you just want to use the tool, prefer downloading from a release instead of building it yourself:
+
+- VS Code users: download the `.vsix` from the relevant release output
+- Obsidian users: use `G:\Projects\0Tools\x-article-in-obsidian` for end-user installation docs and releases
+
+If you need to package the VS Code extension yourself, run:
+
+```bash
+pnpm -C apps/vscode package
+```
+
+This generates a `.vsix` file under `apps/vscode`, which can be installed manually in VS Code.
+
+### 2. Use the Obsidian plugin
+
+If you mainly write and preview in Obsidian, use:
+
+```text
+apps/obsidian
+```
+
+This workspace contains the Obsidian host code. If you want release-facing, installation-oriented end-user docs, `G:\Projects\0Tools\x-article-in-obsidian` is still the better entry point.
+
+### 3. Run the local upload script directly
+
+If you want to send a Markdown file through the local upload automation flow:
+
+```bash
+node "skills/x-article-upload/scripts/upload-article.mjs" "<absolute-path-to-file.md>"
+```
+
+This is useful for Claude Code, Codex, or your own local wrapper scripts.
+
 ## Quick Start
+
+If you are developing in this workspace, start here:
 
 ### Install dependencies
 

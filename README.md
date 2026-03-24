@@ -40,7 +40,48 @@ X Article 的主开发仓库。
 - 在同一个仓库里维护本地自动化上传脚本和宿主集成
 - 作为后续发布、调试和功能迭代的唯一主工作区
 
+## 使用说明
+
+这个仓库主要有三种使用方式：
+
+### 1. 直接使用 VS Code 扩展
+
+如果你只是想开始使用，优先从 Release 获取安装包，而不是自己构建：
+
+- VS Code 用户：优先下载 `apps/vscode` 对应产物或仓库发布页中的 `.vsix`
+- Obsidian 用户：优先查看 `G:\Projects\0Tools\x-article-in-obsidian` 中面向最终用户的安装说明和 Release
+
+如果你需要自己打包 VS Code 扩展，可以执行：
+
+```bash
+pnpm -C apps/vscode package
+```
+
+命令完成后，会在 `apps/vscode` 目录下生成 `.vsix` 文件，可在 VS Code 中手动安装。
+
+### 2. 使用 Obsidian 插件
+
+如果你主要在 Obsidian 里写作和预览，可使用：
+
+```text
+apps/obsidian
+```
+
+这个 workspace 包含 Obsidian 宿主代码；如果你更关心面向最终用户的安装、发布和截图说明，优先查看 `G:\Projects\0Tools\x-article-in-obsidian`。
+
+### 3. 直接调用本地上传脚本
+
+如果你想把 Markdown 文件直接走本地自动化上传流程，可以执行：
+
+```bash
+node "skills/x-article-upload/scripts/upload-article.mjs" "<absolute-path-to-file.md>"
+```
+
+适合接入 Claude Code、Codex，或者你自己的本地包装脚本。
+
 ## 快速开始
+
+如果你是开发者，再从这里开始：
 
 ### 安装依赖
 
