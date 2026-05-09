@@ -40,7 +40,25 @@ const SKILL_DIR     = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOT_ENV_PATH  = join(SKILL_DIR, '.env');
 const WORKSPACE_DIR = resolve(SKILL_DIR, '..', '..');
 const SHARED_TEMPLATE_PATH = join(WORKSPACE_DIR, 'packages', 'publish', 'src', 'template.ts');
-const JITI_PATH = join(WORKSPACE_DIR, 'apps', 'obsidian', 'node_modules', 'jiti');
+// Resolve jiti from any of the workspace's pnpm-managed locations.
+// (Previously hard-coded to apps/obsidian/node_modules; that package was
+// dropped after the standalone plugin took over via vendored sync.)
+const JITI_PATH = (() => {
+  const candidates = [
+    join(WORKSPACE_DIR, 'node_modules', 'jiti'),
+    join(WORKSPACE_DIR, 'packages', 'publish', 'node_modules', 'jiti'),
+  ];
+  for (const p of candidates) if (existsSync(p)) return p;
+  // pnpm flattens deps under .pnpm/<pkg>@<ver>/node_modules/<pkg>
+  try {
+    const pnpmDir = join(WORKSPACE_DIR, 'node_modules', '.pnpm');
+    if (existsSync(pnpmDir)) {
+      const dirs = readdirSync(pnpmDir).filter((d) => d.startsWith('jiti@'));
+      if (dirs.length) return join(pnpmDir, dirs[0], 'node_modules', 'jiti');
+    }
+  } catch { /* ignore */ }
+  return candidates[0]; // fall through with a useful path for the error message
+})();
 
 const MCP_INIT_TIMEOUT_MS     = 10_000;
 const MCP_CALL_TIMEOUT_MS     = 10_000;
