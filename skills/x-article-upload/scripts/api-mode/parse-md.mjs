@@ -19,6 +19,21 @@ export function parseMarkdown(filePath) {
     }
   }
   const title = meta.title || meta.Title || null;
+  // Cover image: frontmatter `cover:` field. Strips wikilink / md-image
+  // wrappers so users can write either bare paths/URLs or the same
+  // `![[...]]` / `![](...)` syntax used inline.
+  let coverRaw = meta.cover || meta.Cover || null;
+  if (coverRaw) {
+    coverRaw = coverRaw
+      .replace(/^!\[\[|\]\]$/g, "")
+      .replace(/^!\[[^\]]*\]\(([^)]+)\)$/u, "$1")
+      .trim();
+  }
+  const cover = coverRaw
+    ? /^https?:\/\//i.test(coverRaw)
+      ? coverRaw
+      : resolve(baseDir, coverRaw)
+    : null;
   const body = (fmMatch ? raw.slice(fmMatch[0].length) : raw).trim();
 
   const atomics = findAtomics(body);
@@ -35,7 +50,7 @@ export function parseMarkdown(filePath) {
   }
   if (cursor < body.length) out.push(...textChunkToSegments(body.slice(cursor)));
 
-  return { title, segments: out, baseDir };
+  return { title, cover, segments: out, baseDir };
 }
 
 function findAtomics(text) {

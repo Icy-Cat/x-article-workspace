@@ -16,6 +16,7 @@ const FEATURES = {
 const QUERY_IDS = {
   UPDATE_CONTENT: "M7N2FrPrlOmu-YrVIBxFnQ",
   UPDATE_TITLE: "x75E2ABzm8_mGTg1bz8hcA",
+  UPDATE_COVER: "Es8InPh7mEkK9PxclxFAVQ",
   GET_BY_ID: "8-OHhj8-KCAHUP8XjPaAYQ",
 };
 
@@ -52,6 +53,25 @@ export async function saveTitle({ bridge, articleId, title }) {
   const js = `(async()=>{
     const H=${authHeadersJs()};
     const r=await fetch('https://x.com/i/api/graphql/${QUERY_IDS.UPDATE_TITLE}/ArticleEntityUpdateTitle',{method:'POST',credentials:'include',headers:{...H,'content-type':'application/json'},body:JSON.stringify(${JSON.stringify(body)})});
+    const t=await r.text();let j=null;try{j=JSON.parse(t)}catch{}
+    return JSON.stringify({status:r.status,err:j?.errors?.[0]?.message||null,raw:t.slice(0,300)});
+  })()`;
+  return bridge.evalJS(js);
+}
+
+export async function saveCoverMedia({ bridge, articleId, mediaId, mediaCategory = "DraftTweetImage" }) {
+  if (!mediaId) return { skipped: true };
+  const body = {
+    variables: {
+      articleEntityId: articleId,
+      coverMedia: { media_id: mediaId, media_category: mediaCategory },
+    },
+    features: FEATURES,
+    queryId: QUERY_IDS.UPDATE_COVER,
+  };
+  const js = `(async()=>{
+    const H=${authHeadersJs()};
+    const r=await fetch('https://x.com/i/api/graphql/${QUERY_IDS.UPDATE_COVER}/ArticleEntityUpdateCoverMedia',{method:'POST',credentials:'include',headers:{...H,'content-type':'application/json'},body:JSON.stringify(${JSON.stringify(body)})});
     const t=await r.text();let j=null;try{j=JSON.parse(t)}catch{}
     return JSON.stringify({status:r.status,err:j?.errors?.[0]?.message||null,raw:t.slice(0,300)});
   })()`;

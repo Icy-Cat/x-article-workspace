@@ -5,8 +5,9 @@
 import { parseMarkdown } from "./parse-md.mjs";
 import { uploadOneImage, flushAutosave } from "./upload-images.mjs";
 import { buildContentState } from "./build-content.mjs";
-import { saveContent, saveTitle, getArticleState } from "./save-content.mjs";
+import { saveContent, saveTitle, saveCoverMedia, getArticleState } from "./save-content.mjs";
 import { makeBridge } from "./mcp-bridge.mjs";
+import { setBanner, clearBanner } from "./banner.mjs";
 
 /**
  * Run API mode end-to-end. Caller is responsible for: token resolution,
@@ -26,6 +27,7 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
     {}
   );
   log(`    Title: ${parsed.title || "(none)"}`);
+  log(`    Cover: ${parsed.cover || "(none)"}`);
   log(`    Segments: ${JSON.stringify(types)}`);
 
   if (!articleId) {
@@ -37,6 +39,12 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
   }
   log(`📝  Article ID: ${articleId}`);
 
+  await setBanner(
+    bridge,
+    "⚠  操作中：请保持本标签页前台，不要在编辑器内手动操作",
+    "warn",
+  );
+
   // Upload images via the editor's onFilesAdded; collect mediaIds
   const mediaMap = {};
   const missingImages = [];
@@ -46,6 +54,7 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
     let i = 0;
     for (const seg of imgSegs) {
       i++;
+      await setBanner(bridge, `📷  正在上传图片 ${i} / ${imgSegs.length}…`, "work");
       const label = seg.source.length > 60 ? "..." + seg.source.slice(-57) : seg.source;
       let lastErr = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -64,12 +73,33 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
         log(`    [${i}/${imgSegs.length}] ✗ ${label}  ${lastErr.message}`);
         missingImages.push(seg.source);
       }
-      // No inter-image sleep — uploads are sequential and X handles
-      // back-to-back onFilesAdded fine. (Removed 1.5 s pause that
-      // dominated wall-clock time for multi-image notes.)
     }
+    await setBanner(bridge, "💾  绑定媒体到文章中…", "work");
     log(`💾  Triggering autosave to bind mediaIds (~10s)...`);
     await flushAutosave(bridge);
+  }
+
+  // Cover image — upload via the same onFilesAdded path (it'll insert
+  // an extra atomic at the end of the editor that we *don't* reference
+  // in our content_state, so it gets discarded on save), then POST
+  // ArticleEntityUpdateCoverMedia with the bound mediaId.
+  if (parsed.cover) {
+    await setBanner(bridge, "🖼  上传封面图…", "work");
+    log(`🖼   Uploading cover: ${parsed.cover}`);
+    try {
+      const coverInfo = await uploadOneImage({ bridge, source: parsed.cover, alt: "cover" });
+      // Bind mediaId via autosave before referencing it in the cover endpoint
+      await flushAutosave(bridge);
+      const cr = await saveCoverMedia({
+        bridge,
+        articleId,
+        mediaId: coverInfo.mediaId,
+        mediaCategory: coverInfo.mediaCategory || "DraftTweetImage",
+      });
+      log(`🖼   Cover save: status=${cr?.status} err=${cr?.err || "OK"}`);
+    } catch (e) {
+      log(`⚠   Cover upload failed: ${e.message}`);
+    }
   }
 
   const { content_state } = buildContentState(parsed, mediaMap);
@@ -78,6 +108,7 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
   );
 
   if (parsed.title) {
+    await setBanner(bridge, "📌  保存标题…", "work");
     try {
       const tr = await saveTitle({ bridge, articleId, title: parsed.title });
       log(`📌  Title save: status=${tr?.status} err=${tr?.err || "OK"}`);
@@ -86,6 +117,7 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
     }
   }
 
+  await setBanner(bridge, "💾  保存正文内容…", "work");
   log(`💾  Saving content...`);
   const sr = await saveContent({ bridge, articleId, contentState: content_state });
   log(`    status=${sr?.status} err=${sr?.err || "OK"} hasData=${sr?.hasData}`);
@@ -101,12 +133,17 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
   // from before the API write — it has no idea we just POSTed new content.
   // Reload the page so the user sees the freshly-saved article without
   // having to refresh manually.
+  await setBanner(bridge, "✅  上传完成，即将刷新页面…", "done");
+  await bridge.sleep(1200);
   log(`🔄  Reloading editor to surface the new content...`);
   try {
     await bridge.evalJS(`(()=>{location.reload();return 'reloading'})()`);
   } catch {
     /* ignore — page may navigate before evalJS returns */
   }
+  // banner gets wiped by the reload anyway; explicit clear here is a no-op
+  // when reload is already in flight, but kept for the failure paths.
+  void clearBanner;
 
   return {
     articleId,
