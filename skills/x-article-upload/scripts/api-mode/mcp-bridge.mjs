@@ -4,8 +4,11 @@
 // All page-side JS goes through `evalJS(js)` which calls
 // browser_evaluate({function: 'async ()=>{...}'}) and parses the result.
 
-const FN_WRAP_PREFIX = "async () => { try { const __r = await ((";
-const FN_WRAP_SUFFIX = ")()); return __r === undefined ? null : __r; } catch (e) { return { __evalError: String(e?.message || e), __evalStack: String(e?.stack || '') }; } }";
+// IIFE expressions like `(()=>{...})()` are wrapped in `await (...)` so the
+// result is unwrapped (handles both sync and async IIFEs). Plain expressions
+// like `JSON.stringify(...)` work the same way.
+const FN_WRAP_PREFIX = "async () => { try { const __r = await (";
+const FN_WRAP_SUFFIX = "); return __r === undefined ? null : __r; } catch (e) { return { __evalError: String(e?.message || e), __evalStack: String(e?.stack || '') }; } }";
 
 export function makeBridge(mcpClient) {
   async function evalJS(jsExpr, { timeoutMs } = {}) {
