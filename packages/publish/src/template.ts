@@ -125,6 +125,96 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     return null;
   }
 
+  // Locate marker even if it spans multiple text nodes. Returns the
+  // start/end (node, offset) pair so we can build a precise Range.
+  function locateMarker(marker) {
+    const editor = findEditor();
+    if (!editor) return null;
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let cur;
+    while ((cur = walker.nextNode())) nodes.push(cur);
+
+    // Single-node fast path (typical case: <p>MPH_MARKER_N</p>).
+    let pos = 0;
+    for (const n of nodes) {
+      const text = n.textContent || "";
+      const off = text.indexOf(marker);
+      if (off >= 0) {
+        return {
+          startNode: n, startOff: off,
+          endNode: n, endOff: off + marker.length,
+          block: n.parentElement?.closest("[data-block='true']") || n.parentElement,
+        };
+      }
+      pos += text.length;
+    }
+
+    // Cross-node fallback: concatenate, locate, then map back.
+    const concat = nodes.map((n) => n.textContent || "").join("");
+    const idx = concat.indexOf(marker);
+    if (idx < 0) return null;
+    let acc = 0;
+    let startNode = null, startOff = 0, endNode = null, endOff = 0;
+    for (const n of nodes) {
+      const len = (n.textContent || "").length;
+      if (!startNode && acc + len > idx) {
+        startNode = n;
+        startOff = idx - acc;
+      }
+      if (startNode && acc + len >= idx + marker.length) {
+        endNode = n;
+        endOff = (idx + marker.length) - acc;
+        break;
+      }
+      acc += len;
+    }
+    if (!startNode || !endNode) return null;
+    return {
+      startNode, startOff, endNode, endOff,
+      block: startNode.parentElement?.closest("[data-block='true']") || startNode.parentElement,
+    };
+  }
+
+  // Delete a marker through Draft.js's beforeinput pipeline so the
+  // editor's internal state stays in sync with the DOM. Direct
+  // textContent mutation only updates the DOM — Draft's EditorState
+  // still holds the marker, so it reappears on preview/re-render and
+  // subsequent inserts compute selection from a stale state, which
+  // can chew up neighbouring text.
+  function deleteMarkerViaEditor(marker) {
+    const editor = findEditor();
+    if (!editor) return false;
+    const info = locateMarker(marker);
+    if (!info) return false;
+
+    editor.focus();
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    const range = document.createRange();
+    try {
+      range.setStart(info.startNode, info.startOff);
+      range.setEnd(info.endNode, info.endOff);
+    } catch {
+      return false;
+    }
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    let ok = false;
+    try {
+      ok = document.execCommand("delete", false);
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      // Fallback: insertText with empty string also routes through beforeinput.
+      try { document.execCommand("insertText", false, ""); } catch { /* ignore */ }
+    }
+    return true;
+  }
+
   function deleteMarkerFromTextNode(node, marker, offset) {
     const text = node.textContent || "";
     const markerOffset = typeof offset === "number" ? offset : text.indexOf(marker);
@@ -191,23 +281,26 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
   }
 
   async function focusMarker(marker) {
-    const markerInfo = findMarker(marker);
-    if (!markerInfo?.node || !markerInfo.block) {
+    const info = locateMarker(marker);
+    if (!info || !info.block) {
       return null;
     }
- 
-    markerInfo.block.scrollIntoView({ behavior: "instant", block: "center" });
+
+    info.block.scrollIntoView({ behavior: "instant", block: "center" });
     await sleep(150);
 
     const range = document.createRange();
-    range.setStart(markerInfo.node, markerInfo.offset);
-    range.setEnd(markerInfo.node, markerInfo.offset + marker.length);
+    try {
+      range.setStart(info.startNode, info.startOff);
+      range.setEnd(info.endNode, info.endOff);
+    } catch {
+      return null;
+    }
     const rect = range.getBoundingClientRect();
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-    await sleep(50);
-    await sleep(150);
+    await sleep(200);
     return { rect: getRectAfterToken(marker) || rect, marker, token: marker };
   }
 
@@ -228,11 +321,18 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
   }
 
   function removeAnchorToken(token) {
-    const found = findAnchorToken(token);
-    if (!found) return false;
+    const info = locateMarker(token);
+    if (!info) return false;
 
-    deleteMarkerFromTextNode(found.node, token, found.offset);
-    removeEmptyBlock(found.node.parentElement?.closest("[data-block='true']"));
+    const block = info.block;
+    const ok = deleteMarkerViaEditor(token);
+    if (!ok) {
+      // Last-ditch fallback: mutate textContent. This desyncs Draft state
+      // (marker may reappear on re-render) but at least clears the DOM.
+      const found = findAnchorToken(token);
+      if (found) deleteMarkerFromTextNode(found.node, token, found.offset);
+    }
+    removeEmptyBlock(block);
     return true;
   }
 
@@ -251,16 +351,25 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     const editor = findEditor();
     if (!editor) return;
 
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    const markerPattern = /(?:^|\\s)MPH_MARKER_\\d+(?=\\s|$)/g;
+    // Iteratively delete each remaining MPH_MARKER_N via Draft's command
+    // pipeline so EditorState stays in sync. Bounded loop to avoid infinite
+    // loops if a marker becomes undeletable for some reason.
+    const markerScan = /MPH_MARKER_\\d+/;
     const touchedBlocks = new Set();
-    let current;
-    while ((current = walker.nextNode())) {
-      const text = current.textContent || "";
-      const cleaned = text.replace(markerPattern, " ").replace(/\\s{2,}/g, " ").trim();
-      if (cleaned !== text.trim()) {
-        current.textContent = cleaned;
-        touchedBlocks.add(current.parentElement?.closest("[data-block='true']"));
+    for (let guard = 0; guard < 200; guard += 1) {
+      const text = editor.textContent || "";
+      const match = text.match(markerScan);
+      if (!match) break;
+      const marker = match[0];
+      const info = locateMarker(marker);
+      if (info) touchedBlocks.add(info.block);
+      const removed = deleteMarkerViaEditor(marker);
+      if (!removed) {
+        // Fallback: textContent mutation — last resort.
+        const found = findAnchorToken(marker);
+        if (!found) break;
+        deleteMarkerFromTextNode(found.node, marker, found.offset);
+        touchedBlocks.add(found.node.parentElement?.closest("[data-block='true']"));
       }
     }
 
