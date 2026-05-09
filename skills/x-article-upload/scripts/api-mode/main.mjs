@@ -64,7 +64,9 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
         log(`    [${i}/${imgSegs.length}] ✗ ${label}  ${lastErr.message}`);
         missingImages.push(seg.source);
       }
-      await new Promise((r) => setTimeout(r, 1500));
+      // No inter-image sleep — uploads are sequential and X handles
+      // back-to-back onFilesAdded fine. (Removed 1.5 s pause that
+      // dominated wall-clock time for multi-image notes.)
     }
     log(`💾  Triggering autosave to bind mediaIds (~10s)...`);
     await flushAutosave(bridge);
@@ -94,6 +96,17 @@ export async function runApiMode({ mcpClient, mdPath, articleId, log = console.l
   log(
     `    title=${verify?.title || "(none)"} blocks=${verify?.blockCount} entities=${verify?.entityCount}`
   );
+
+  // The editor's local Draft EditorState is still the (mostly empty) state
+  // from before the API write — it has no idea we just POSTed new content.
+  // Reload the page so the user sees the freshly-saved article without
+  // having to refresh manually.
+  log(`🔄  Reloading editor to surface the new content...`);
+  try {
+    await bridge.evalJS(`(()=>{location.reload();return 'reloading'})()`);
+  } catch {
+    /* ignore — page may navigate before evalJS returns */
+  }
 
   return {
     articleId,

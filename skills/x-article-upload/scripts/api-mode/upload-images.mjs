@@ -10,8 +10,6 @@
 import { readFileSync } from "node:fs";
 import { extname, basename } from "node:path";
 
-const CHUNK_SIZE = 5500;
-
 function inferMime(filename) {
   const ext = extname(filename).slice(1).toLowerCase();
   return ({
@@ -23,14 +21,15 @@ function inferMime(filename) {
   })[ext] || "image/png";
 }
 
+// Stage the entire base64 in one browser_evaluate call. Both Playwright
+// MCP (stdio JSON-RPC) and bb-browser daemon (HTTP) handle large payloads
+// fine; the previous 5.5 KB chunking was a leftover from an earlier
+// cmd.exe-spawn variant of bb-browser that hit Windows' 32 KB cmdline
+// limit. Per-image staging time dropped from ~10 s to ~200 ms.
 async function stageBytes(bridge, base64) {
-  await bridge.evalJS(`(()=>{window.__imgChunks=[];return 'reset'})()`);
-  for (let i = 0; i < base64.length; i += CHUNK_SIZE) {
-    const chunk = base64.slice(i, i + CHUNK_SIZE);
-    await bridge.evalJS(
-      `(()=>{window.__imgChunks.push('${chunk}');return window.__imgChunks.length})()`
-    );
-  }
+  await bridge.evalJS(
+    `(()=>{window.__imgB64=${JSON.stringify(base64)};return window.__imgB64.length})()`
+  );
 }
 
 /**
@@ -61,7 +60,7 @@ export async function uploadOneImage({ bridge, source, alt }) {
   const mimeJs = JSON.stringify(mime);
   const callJs = `(async()=>{
     try {
-      const b64 = (window.__imgChunks||[]).join('');
+      const b64 = window.__imgB64 || '';
       const bin = atob(b64);
       const u = new Uint8Array(bin.length);
       for (let i=0; i<bin.length; i++) u[i] = bin.charCodeAt(i);
@@ -94,7 +93,7 @@ export async function uploadOneImage({ bridge, source, alt }) {
       });
 
       onFilesAdded([file]);
-      delete window.__imgChunks;
+      delete window.__imgB64;
       return {ok:true, beforeKeys: Array.from(before)};
     } catch (e) {
       return {ok:false, step:'exception', err: String(e?.message || e)};
@@ -108,7 +107,7 @@ export async function uploadOneImage({ bridge, source, alt }) {
   let info = null;
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
-    await bridge.sleep(800);
+    await bridge.sleep(300);
     const probe = await bridge.evalJS(
       `(()=>{
         function getFiber(n){const k=Object.keys(n).find(x=>x.startsWith('__reactFiber$'));return k?n[k]:null}
