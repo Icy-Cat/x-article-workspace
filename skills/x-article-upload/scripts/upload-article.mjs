@@ -285,11 +285,82 @@ try {
     const itemSummary = payload.items.map(i => i.type).join(', ') || 'none';
     console.log(`    Title: ${payload.title ?? '(none)'} | Items: [${itemSummary}]${payload.cover ? ' | Cover: ✓' : ''}`);
     console.log('✍️   Publishing via shared browser template...');
-    const publishResult = await client.evaluate(buildSharedWorkspaceBrowserPublishFunction(payload));
-    if (!publishResult?.ok) {
-      throw new Error(`Shared publish failed: ${JSON.stringify(publishResult)}`);
+    let publishResult = null;
+    let publishErr = null;
+    try {
+      publishResult = await client.evaluate(buildSharedWorkspaceBrowserPublishFunction(payload));
+    } catch (e) {
+      publishErr = e;
+      console.warn(`    ⚠ publish raised: ${e.message?.slice(0, 200) || e}`);
     }
-    console.log(`    Structured items processed: ${publishResult.processedItems ?? 0}/${publishResult.totalItems ?? payload.items.length}`);
+    if (publishResult?.ok) {
+      console.log(`    Structured items processed: ${publishResult.processedItems ?? 0}/${publishResult.totalItems ?? payload.items.length}`);
+    }
+
+    // Independent marker cleanup phase: even if publish errored mid-flight
+    // (e.g. "Execution context was destroyed" from X-side navigation), this
+    // Fiber pass scrubs every remaining MPH_MARKER_N block from the live
+    // EditorState. Synthesized events don't trigger autosave, so we follow
+    // up with a CDP-level Backspace.
+    console.log('🧹  Running independent marker cleanup (Fiber)...');
+    try {
+      const cleanupResult = await client.evaluate(`async () => {
+        const ed = document.querySelector("[data-contents='true']")?.closest("[contenteditable='true']")
+                || document.querySelector("[contenteditable='true']");
+        if (!ed) return { ok: false, reason: 'no editor' };
+        const fiberKey = Object.keys(ed).find((k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+        if (!fiberKey) return { ok: false, reason: 'no fiber' };
+        let f = ed[fiberKey], depth = 0, sn = null;
+        while (f && depth < 60) {
+          const node = f.stateNode;
+          if (node?.props?.editorState && typeof node.props.onChange === 'function') { sn = node; break; }
+          f = f.return; depth += 1;
+        }
+        if (!sn) return { ok: false, reason: 'no draft' };
+        const editorState = sn.props.editorState;
+        const onChange = sn.props.onChange;
+        const ESCtor = editorState.constructor;
+        const SSCtor = editorState.getSelection().constructor;
+        const cs = editorState.getCurrentContent();
+        const blockMap = cs.getBlockMap();
+        const markerLine = /^\\s*MPH_MARKER_\\d+\\s*$/;
+        const before = blockMap.size;
+        const newMap = blockMap.filter((b) => {
+          if (b.getType() === 'atomic') return true;
+          return !markerLine.test(b.getText() || '');
+        });
+        const removed = before - newMap.size;
+        if (removed === 0) return { ok: true, removed: 0 };
+        const survivor = newMap.first();
+        const safeSel = survivor ? SSCtor.createEmpty(survivor.getKey()) : editorState.getSelection();
+        const newCs = cs.set('blockMap', newMap).set('selectionBefore', safeSel).set('selectionAfter', safeSel);
+        let newState = ESCtor.push(editorState, newCs, 'remove-range');
+        newState = ESCtor.moveSelectionToEnd(newState);
+        onChange(newState);
+        return { ok: true, removed, remainingBlocks: newMap.size };
+      }`);
+      console.log(`    Removed ${cleanupResult?.removed ?? '?'} marker block(s); remaining ${cleanupResult?.remainingBlocks ?? '?'}`);
+    } catch (e) {
+      console.warn(`    ⚠ marker cleanup failed: ${e.message?.slice(0, 200)}`);
+    }
+
+    // Trigger autosave so the cleanup persists. X's debouncer needs a
+    // trusted input event — synthesized events from inside the page don't
+    // count (verified in spike/x-article-direct-api). One CDP keystroke
+    // does the job.
+    console.log('💾  Nudging autosave (Backspace + 8s wait)...');
+    try {
+      await client.call('browser_press_key', { key: 'Backspace' });
+    } catch (e) {
+      console.warn(`    ⚠ autosave nudge failed: ${e.message}`);
+    }
+    await new Promise((r) => setTimeout(r, 8000));
+
+    // If publish itself raised AND cleanup didn't help, surface the error.
+    if (publishErr && !publishResult?.ok) {
+      throw publishErr;
+    }
+
     const draftUrl = await client.evaluate(`() => {
       const href = window.location.href || '';
       return typeof href === 'string' ? href : '';
