@@ -105,6 +105,26 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     await sleep(200);
   }
 
+  // Boundary-aware token finder: makes sure "MPH_MARKER_1" doesn't match
+  // inside "MPH_MARKER_10" / "MPH_MARKER_11" etc. Only succeeds when the
+  // characters immediately before and after the token are non-word.
+  function isTokenBoundaryChar(ch) {
+    return !ch || !/[A-Za-z0-9_]/.test(ch);
+  }
+  function findExactTokenOffset(text, token) {
+    if (!text || !token) return -1;
+    let from = 0;
+    while (from < text.length) {
+      const off = text.indexOf(token, from);
+      if (off < 0) return -1;
+      const before = off > 0 ? text[off - 1] : "";
+      const after = off + token.length < text.length ? text[off + token.length] : "";
+      if (isTokenBoundaryChar(before) && isTokenBoundaryChar(after)) return off;
+      from = off + token.length;
+    }
+    return -1;
+  }
+
   function findMarker(marker) {
     const editor = findEditor();
     if (!editor) return null;
@@ -112,7 +132,7 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
     let current;
     while ((current = walker.nextNode())) {
-      const offset = current.textContent.indexOf(marker);
+      const offset = findExactTokenOffset(current.textContent || "", marker);
       if (offset >= 0) {
         return {
           node: current,
@@ -139,7 +159,7 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     let pos = 0;
     for (const n of nodes) {
       const text = n.textContent || "";
-      const off = text.indexOf(marker);
+      const off = findExactTokenOffset(text, marker);
       if (off >= 0) {
         return {
           startNode: n, startOff: off,
@@ -150,9 +170,9 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
       pos += text.length;
     }
 
-    // Cross-node fallback: concatenate, locate, then map back.
+    // Cross-node fallback: concatenate, locate (with boundary check), then map back.
     const concat = nodes.map((n) => n.textContent || "").join("");
-    const idx = concat.indexOf(marker);
+    const idx = findExactTokenOffset(concat, marker);
     if (idx < 0) return null;
     let acc = 0;
     let startNode = null, startOff = 0, endNode = null, endOff = 0;
@@ -217,7 +237,7 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
 
   function deleteMarkerFromTextNode(node, marker, offset) {
     const text = node.textContent || "";
-    const markerOffset = typeof offset === "number" ? offset : text.indexOf(marker);
+    const markerOffset = typeof offset === "number" ? offset : findExactTokenOffset(text, marker);
     if (markerOffset < 0) {
       return false;
     }
@@ -311,7 +331,7 @@ export function getBrowserPublishFunctionTemplate(payload: PublishPayload): stri
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
     let current;
     while ((current = walker.nextNode())) {
-      const offset = current.textContent.indexOf(token);
+      const offset = findExactTokenOffset(current.textContent || "", token);
       if (offset >= 0) {
         return { node: current, offset };
       }
