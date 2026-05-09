@@ -290,14 +290,52 @@ try {
       ].join(';');
       el.textContent = '⚠  操作中：请保持本标签页前台，不要在编辑器内手动操作';
     }
+    function isVisible(el) {
+      if (!el) return false;
+      const s = window.getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+    // Robust create-button finder. X periodically rewrites this surface
+    // (different aria-label per locale, occasional UI redesigns), so we
+    // try multiple strategies and stop at the first hit.
+    function findCreateButton() {
+      // 1. Known aria-label values across locales (the lowercase token
+      //    "create" has been observed in Chinese builds; English builds
+      //    have shipped both "Create" and various translated strings).
+      const ariaTerms = new Set([
+        'create','compose','write','draft','new article','撰写','新建','创建',
+        '新規','作成','作成する','redactar','écrire','créer','escribir','schreiben',
+        'verfassen','escrever','새 글 작성','글 작성','記事を作成'
+      ].map(s => s.toLowerCase()));
+      for (const btn of document.querySelectorAll("button, a[role='button'], [role='link']")) {
+        if (!isVisible(btn)) continue;
+        const aria = (btn.getAttribute('aria-label') || '').toLowerCase().trim();
+        if (aria && ariaTerms.has(aria)) return btn;
+      }
+      // 2. Empty-state "撰写" / "Compose" link on the article home
+      const empty = document.querySelector("a[data-testid='empty_state_button_text']");
+      if (empty && isVisible(empty)) return empty;
+      // 3. Any anchor whose href ends in /compose/articles (the floating
+      //    "+" button is sometimes an <a> with this href)
+      for (const a of document.querySelectorAll("a[href*='/compose/articles']")) {
+        if (isVisible(a)) return a;
+      }
+      // 4. SVG path fingerprint of the pencil-with-plus "compose new
+      //    article" icon. The path data starts with M14.543 5.04297 and
+      //    has been stable across X UI updates we've seen.
+      for (const btn of document.querySelectorAll('button')) {
+        if (!isVisible(btn)) continue;
+        for (const p of btn.querySelectorAll('svg path[d]')) {
+          const d = p.getAttribute('d') || '';
+          if (d.startsWith('M14.543 5.04297')) return btn;
+        }
+      }
+      return null;
+    }
     paintBanner();
-    const btn =
-      document.querySelector("button[aria-label='create']") ||
-      Array.from(document.querySelectorAll('button')).find(
-        b => (b.getAttribute('aria-label') || '').toLowerCase() === 'create'
-      ) ||
-      // Fallback: empty-state "撰写" link in the article home
-      document.querySelector("a[data-testid='empty_state_button_text']");
+    const btn = findCreateButton();
     if (!btn) throw new Error('Create button not found.');
     btn.click();
     for (let i = 0; i < 30; i++) {
