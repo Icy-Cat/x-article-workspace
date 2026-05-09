@@ -242,11 +242,55 @@ const client = await StdioMcpClient.connect(token);
 try {
   console.log('🌐  Navigating to X article editor...');
   await client.call('browser_navigate', { url: 'https://x.com/compose/articles' });
+  // Inject the warning banner the moment the page is reachable, before
+  // we wait for X's UI or click anything. This way the user sees the
+  // "don't touch the editor" message instantly and not after the first
+  // few seconds of MCP setup.
+  await client.evaluate(`() => {
+    let el = document.getElementById('__x_article_uploader_banner__');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = '__x_article_uploader_banner__';
+      document.body.appendChild(el);
+    }
+    el.style.cssText = [
+      'position:fixed','top:0','left:0','right:0','z-index:2147483647',
+      'background:linear-gradient(90deg,#f59e0b,#ef4444)',
+      'color:#fff','font-size:15px','font-weight:600',
+      'padding:12px 20px','text-align:center',
+      'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
+      'font-family:-apple-system,Segoe UI,system-ui,sans-serif',
+      'letter-spacing:0.3px','transition:background 0.25s ease',
+      'pointer-events:none'
+    ].join(';');
+    el.textContent = '⚠  操作中：请保持本标签页前台，不要在编辑器内手动操作';
+    return 'banner-ready';
+  }`).catch(() => { /* banner is cosmetic */ });
   await client.call('browser_wait_for', { time: 2 });
 
   console.log('🖱️   Clicking Create button...');
   await client.evaluate(`async () => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
+    function paintBanner() {
+      let el = document.getElementById('__x_article_uploader_banner__');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = '__x_article_uploader_banner__';
+        document.body.appendChild(el);
+      }
+      el.style.cssText = [
+        'position:fixed','top:0','left:0','right:0','z-index:2147483647',
+        'background:linear-gradient(90deg,#f59e0b,#ef4444)',
+        'color:#fff','font-size:15px','font-weight:600',
+        'padding:12px 20px','text-align:center',
+        'box-shadow:0 2px 12px rgba(0,0,0,0.25)',
+        'font-family:-apple-system,Segoe UI,system-ui,sans-serif',
+        'letter-spacing:0.3px','transition:background 0.25s ease',
+        'pointer-events:none'
+      ].join(';');
+      el.textContent = '⚠  操作中：请保持本标签页前台，不要在编辑器内手动操作';
+    }
+    paintBanner();
     const btn =
       document.querySelector("button[aria-label='create']") ||
       Array.from(document.querySelectorAll('button')).find(
@@ -257,10 +301,14 @@ try {
     if (!btn) throw new Error('Create button not found.');
     btn.click();
     for (let i = 0; i < 30; i++) {
+      paintBanner();
       const ed =
         document.querySelector("[data-contents='true'] [contenteditable='true']") ||
         document.querySelector("[contenteditable='true']");
-      if (ed) return true;
+      if (ed) {
+        paintBanner();
+        return true;
+      }
       await sleep(200);
     }
     throw new Error('Editor did not become ready after clicking Create.');
