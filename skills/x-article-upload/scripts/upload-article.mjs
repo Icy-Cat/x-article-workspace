@@ -53,9 +53,9 @@ let sharedBrowserPublishBuilder = null;
 // CLI args
 // ─────────────────────────────────────────────────────────────────────────────
 const args = argv.slice(2);
-const filePath = args.find(a => !a.startsWith('-'));
+const filePath = args.find(a => !a.startsWith('-') && !looksLikeFlagValue(a));
 if (!filePath) {
-  console.error('Usage: node upload-article.mjs <file.md> [--token <TOKEN>]');
+  console.error('Usage: node upload-article.mjs <file.md> [--mode=api|menu] [--token <TOKEN>]');
   exit(1);
 }
 const absFilePath = resolve(filePath);
@@ -66,6 +66,20 @@ if (!existsSync(absFilePath)) {
 
 const cliTokenIdx = args.indexOf('--token');
 const cliToken    = cliTokenIdx !== -1 ? args[cliTokenIdx + 1] : null;
+
+// --mode=api (default) | --mode=menu
+const modeArg = args.find(a => a.startsWith('--mode='));
+const MODE = modeArg ? modeArg.slice('--mode='.length).trim() : 'api';
+if (MODE !== 'api' && MODE !== 'menu') {
+  console.error(`Unknown --mode value: ${MODE}. Use 'api' or 'menu'.`);
+  exit(1);
+}
+
+// Helper: positional file arg should not be the value following --token
+function looksLikeFlagValue(a) {
+  const idx = args.indexOf(a);
+  return idx > 0 && args[idx - 1] === '--token';
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // StdioMcpClient — JSON-RPC over stdio (must be defined before main() is called)
@@ -201,13 +215,9 @@ if (!token) {
 
 console.log(`✅  Token resolved (${detectTokenSource(token)})`);
 
-// Step 2 — Process markdown → HTML payload (async: fetches remote images)
-console.log(`📄  Processing: ${absFilePath}`);
-const payload = await processMarkdown(absFilePath);
-  const itemSummary = payload.items.map(i => i.type).join(', ') || 'none';
-  console.log(`    Title: ${payload.title ?? '(none)'} | Items: [${itemSummary}]${payload.cover ? ' | Cover: ✓' : ''}`);
+console.log(`🚦  Mode: ${MODE}`);
 
-// Step 3 — Spawn playwright MCP and run the full browser flow
+// Step 3 — Spawn playwright MCP, navigate to compose, click Create
 console.log('🚀  Starting playwright MCP...');
 const client = await StdioMcpClient.connect(token);
 
@@ -223,7 +233,9 @@ try {
       document.querySelector("button[aria-label='create']") ||
       Array.from(document.querySelectorAll('button')).find(
         b => (b.getAttribute('aria-label') || '').toLowerCase() === 'create'
-      );
+      ) ||
+      // Fallback: empty-state "撰写" link in the article home
+      document.querySelector("a[data-testid='empty_state_button_text']");
     if (!btn) throw new Error('Create button not found.');
     btn.click();
     for (let i = 0; i < 30; i++) {
@@ -236,21 +248,39 @@ try {
     throw new Error('Editor did not become ready after clicking Create.');
   }`);
 
-  console.log('✍️   Publishing via shared browser template...');
-  const publishResult = await client.evaluate(buildSharedWorkspaceBrowserPublishFunction(payload));
-  if (!publishResult?.ok) {
-    throw new Error(`Shared publish failed: ${JSON.stringify(publishResult)}`);
+  if (MODE === 'api') {
+    // API mode: parse markdown into segments, upload images via onFilesAdded,
+    // POST ArticleEntityUpdateContent directly. No menu interaction.
+    const { runApiMode } = await import('./api-mode/main.mjs');
+    const result = await runApiMode({ mcpClient: client, mdPath: absFilePath });
+    console.log('');
+    console.log('✅  Article uploaded (api mode).');
+    console.log(`    Draft URL: ${result.url}`);
+    if (result.missingImages?.length) {
+      console.log(`    ⚠ Missing images (insert manually): ${result.missingImages.length}`);
+      result.missingImages.forEach(s => console.log(`      - ${s}`));
+    }
+  } else {
+    // Menu mode: legacy flow — paste full HTML + click Insert menu for code/divider/image
+    console.log(`📄  Processing markdown (legacy v1 path)...`);
+    const payload = await processMarkdown(absFilePath);
+    const itemSummary = payload.items.map(i => i.type).join(', ') || 'none';
+    console.log(`    Title: ${payload.title ?? '(none)'} | Items: [${itemSummary}]${payload.cover ? ' | Cover: ✓' : ''}`);
+    console.log('✍️   Publishing via shared browser template...');
+    const publishResult = await client.evaluate(buildSharedWorkspaceBrowserPublishFunction(payload));
+    if (!publishResult?.ok) {
+      throw new Error(`Shared publish failed: ${JSON.stringify(publishResult)}`);
+    }
+    console.log(`    Structured items processed: ${publishResult.processedItems ?? 0}/${publishResult.totalItems ?? payload.items.length}`);
+    const draftUrl = await client.evaluate(`() => {
+      const href = window.location.href || '';
+      return typeof href === 'string' ? href : '';
+    }`);
+    console.log('');
+    console.log('✅  Article uploaded (menu mode).');
+    if (payload.title) console.log(`    Title: "${payload.title}"`);
+    console.log(`    Draft URL: ${typeof draftUrl === 'string' && draftUrl ? draftUrl : 'https://x.com/compose/articles'}`);
   }
-  console.log(`    Structured items processed: ${publishResult.processedItems ?? 0}/${publishResult.totalItems ?? payload.items.length}`);
-  const draftUrl = await client.evaluate(`() => {
-    const href = window.location.href || '';
-    return typeof href === 'string' ? href : '';
-  }`);
-
-  console.log('');
-  console.log('✅  Article draft uploaded successfully!');
-  if (payload.title) console.log(`    Title: "${payload.title}"`);
-  console.log(`    Draft URL: ${typeof draftUrl === 'string' && draftUrl ? draftUrl : 'https://x.com/compose/articles'}`);
 } finally {
   await client.close();
 }
