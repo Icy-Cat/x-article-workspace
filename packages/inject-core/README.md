@@ -113,21 +113,27 @@ The MAIN-world Fiber script (`injector-main.js`) must be loaded into the X.com p
 
 ```
 src/
-├── index.js                       # public exports
+├── index.js                       # public exports + InjectCoreAdapters typedef
 ├── main/
-│   └── injector-main.js           # MAIN-world Fiber + onFilesAdded (commit 1)
-├── content/                       # ISOLATED-world / bridge-side logic
-│   ├── detect.js                  # Markdown heuristics                  (commit 1)
-│   ├── orchestrator-core.js       # pipeline orchestrator                (commit 2)
-│   ├── segments-to-html.js        # build paste payload + marker plan    (commit 2)
-│   ├── image-loader.js            # remote image fetch via adapter       (commit 2)
-│   └── file-import.js             # .md file → markdown text             (commit 2)
+│   └── injector-main.js           # MAIN-world Fiber + onFilesAdded
+├── content/
+│   ├── detect.js                  # Markdown heuristic patterns
+│   ├── orchestrator-core.js       # pipeline orchestrator (runPipeline)
+│   ├── segments-to-html.js        # build paste payload + marker plan
+│   └── image-loader.js            # data: parser + adapter-driven fetch
 ├── vendor/
-│   ├── parse-md.js                # vendored MD parser                   (commit 1)
-│   └── render-table.js            # table → PNG via SVG/Canvas           (commit 1)
+│   ├── parse-md.js                # vendored MD parser
+│   └── render-table.js            # table → PNG via SVG/Canvas
 └── local-image/
-    └── resolver.js                # `isLocalPath` + path classification  (commit 2)
+    └── resolver.js                # isLocalPath classifier
 ```
+
+**Not in inject-core (intentionally):**
+
+- `file-import.js` — the extension's "drop a .md → create new draft → paste plain text" UX is host-specific DOM choreography (clicks X.com buttons by locale-invariant SVG path, navigates via `history.pushState`, dispatches synthetic paste events). The Obsidian D4 path replaces it with Playwright navigation + direct page.evaluate, so no shared abstraction is meaningful.
+- `banner.js` / `i18n.js` / `local-prompt.js` — UI / host concerns, see adapter contract.
+- `license/` — extension monetization.
+- `background/` — service worker lifecycle.
 
 ## Status
 
@@ -141,7 +147,10 @@ Roadmap:
 
 | Phase | Tracked in | Description |
 |---|---|---|
-| commit 1 | task #16 (this) | Package skeleton + 4 dependency-free files |
-| commit 2 | task #16 | `orchestrator-core` fork + `image-loader` fetcher refactor + adapter contract codification |
+| commit 1 | task #16 | Package skeleton + 4 dependency-free files |
+| commit 1.5 | task #16 | Contract tightening: `ImageResult` discriminated union, `onProgress` add `'done'` |
+| commit 2a | task #16 | `image-loader` factory + `isLocalPath` stub |
+| commit 2b | task #16 | `segments-to-html` (i18n adapter) + `image-loader` data: in-core + `normalizeImageResult` |
+| commit 2c | task #16 | `orchestrator-core` fork (license / vault prompt / banner DOM stripped) + adapter-driven `runPipeline` |
 | commit 3 | task #16 | `x-article-md-paste` switches to importing this package, 5 fixtures pass |
 | follow-up | task #17 | `x-article-in-obsidian` adopts via `page.evaluate` + bridge |

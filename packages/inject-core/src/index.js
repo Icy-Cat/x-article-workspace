@@ -15,11 +15,20 @@
 //   commit 2: orchestrator-core fork + image-loader fetcher refactor
 //   commit 3: x-article-md-paste switches to importing this package
 
+// Pipeline entry point — orchestrates parse → image/table prefetch →
+// payload build → postRun handshake with MAIN world Fiber injector.
+export { runPipeline } from './content/orchestrator-core.js';
+
+// Lower-level building blocks (exposed so hosts can compose their own
+// flows if `runPipeline` is too opinionated).
 export { renderTableToImage } from './vendor/render-table.js';
 export { parseMarkdownText } from './vendor/parse-md.js';
+export { buildPastePayload, segmentsToPlain } from './content/segments-to-html.js';
+export { createImageLoader, normalizeImageResult } from './content/image-loader.js';
+export { isLocalPath } from './local-image/resolver.js';
 
 // detect.js is currently const-only and not yet a named export; surfaced
-// through default import for the moment, formalized in commit 2.
+// through default import for the moment.
 export * as detect from './content/detect.js';
 
 // injector-main.js is a side-effect script that registers a window.postMessage
