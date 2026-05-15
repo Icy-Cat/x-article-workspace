@@ -64,5 +64,6 @@ export * as detect from './content/detect.js';
 //  * }} InjectCoreAdapters
 //  */
 //
-// `runPipeline({ markdown, articleId?, adapters })` will live here once
-// `orchestrator-core.js` lands in commit 2.
+// `runPipeline({ parsed, adapters })` lives in
+// `./content/orchestrator-core.js` and is re-exported at the top of this
+// file. See its JSDoc for full options.
