@@ -33,10 +33,13 @@ export * as detect from './content/detect.js';
 //
 // Image result uses a discriminated union so callers (and the pipeline)
 // don't have to defend against the half-successful `ok:true` + missing
-// base64 shape. Both `fetchImage` and `resolveLocalImage` share the type.
+// base64/mime shape. Both `fetchImage` and `resolveLocalImage` share the
+// type. `fileName` is optional — inject-core derives one from source URL
+// (or timestamp for data: URIs) when the adapter omits it, so hosts can
+// skip naming concerns entirely.
 //
 // /** @typedef {(
-//  *   | { ok: true;  base64: string; mime: string; fileName: string }
+//  *   | { ok: true;  base64: string; mime: string; fileName?: string }
 //  *   | { ok: false; error: string }
 //  * )} ImageResult
 //  */

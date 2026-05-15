@@ -32,7 +32,7 @@ import { isLocalPath } from '../local-image/resolver.js';
 
 /**
  * @typedef {(
- *   | { ok: true;  base64: string; mime: string; fileName: string }
+ *   | { ok: true;  base64: string; mime: string; fileName?: string }
  *   | { ok: false; error: string }
  * )} ImageResult
  */

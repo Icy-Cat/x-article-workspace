@@ -31,10 +31,14 @@ The pipeline is **pure** in the sense that it takes no global state — all I/O 
 /**
  * Discriminated union — `fetchImage` and `resolveLocalImage` share this shape.
  * Used everywhere so the pipeline (and host code) never has to defend against
- * a half-successful `ok: true` with missing base64/mime/fileName.
+ * a half-successful `ok: true` with missing base64/mime.
+ *
+ * `fileName` is optional: if the adapter omits it, inject-core derives one
+ * from the source URL (or timestamp for data: URIs) and uses the mime to
+ * pick an extension. Lets host adapters skip naming concerns entirely.
  */
 type ImageResult =
-  | { ok: true;  base64: string; mime: string; fileName: string }
+  | { ok: true;  base64: string; mime: string; fileName?: string }
   | { ok: false; error: string };
 
 interface InjectCoreAdapters {
