@@ -105,6 +105,7 @@ bridge 模式本质是 "bridge 扩展装到用户真实 Chrome → 暴露 CDP �
 - `src/background/` — service worker 生命周期
 - `src/license/` — 商业化（试用 / 计费）
 - `src/content/{import-button,banner,local-prompt,i18n,loader,file-dropzone,index}.js` — UI / 入口 / URL 闸门
+- `src/content/file-import.js` — 扩展端的 .md drop / picker 到 X 编辑器的 DOM 编排（locale-invariant SVG 按钮查找 + `history.pushState` 导航 + synthetic ClipboardEvent）。D4 Obsidian 端走 Playwright `page.goto` + 直接 `page.evaluate(runPipeline)`，两端无共享抽象，host 各自实现（2026-05-16 commit 2c 决策）
 - 整个 manifest.json — 加载方式
 
 ### Adapter Contract（调用方注入）
