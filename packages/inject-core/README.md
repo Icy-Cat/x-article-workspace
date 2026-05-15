@@ -39,9 +39,13 @@ type ImageResult =
 
 interface InjectCoreAdapters {
   /**
-   * Fetch a remote image URL. Host-defined because:
+   * Fetch a remote `http(s)://` image URL. Host-defined because:
    *   - Extension: chrome.runtime.sendMessage to background fetch (CORS bypass)
    *   - Plugin: Obsidian requestUrl / Electron net.fetch (no CORS to begin with)
+   *
+   * **Adapter is NOT expected to handle `data:` URIs** — inject-core parses
+   * those itself in `image-loader.js`'s data-URI branch, ensuring identical
+   * inline-image behavior across hosts.
    */
   fetchImage: (url: string) => Promise<ImageResult>;
 
