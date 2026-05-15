@@ -31,23 +31,21 @@ export * as detect from './content/detect.js';
 // adapter contract — formalized here so both calling sides typecheck against
 // the same shape. TypeScript declarations will arrive in commit 2.
 //
+// Image result uses a discriminated union so callers (and the pipeline)
+// don't have to defend against the half-successful `ok:true` + missing
+// base64 shape. Both `fetchImage` and `resolveLocalImage` share the type.
+//
+// /** @typedef {(
+//  *   | { ok: true;  base64: string; mime: string; fileName: string }
+//  *   | { ok: false; error: string }
+//  * )} ImageResult
+//  */
+//
 // /** @typedef {{
-//  *   fetchImage:        (url: string) => Promise<{
-//  *     ok: boolean;
-//  *     base64?: string;
-//  *     mime?: string;
-//  *     fileName?: string;
-//  *     error?: string;
-//  *   }>;
-//  *   resolveLocalImage?: (path: string) => Promise<{
-//  *     ok: boolean;
-//  *     base64?: string;
-//  *     mime?: string;
-//  *     fileName?: string;
-//  *     error?: string;
-//  *   }>;
+//  *   fetchImage:         (url: string) => Promise<ImageResult>;
+//  *   resolveLocalImage?: (path: string) => Promise<ImageResult>;
 //  *   onProgress?:        (
-//  *     status: 'idle' | 'work' | 'warn' | 'error',
+//  *     status: 'idle' | 'work' | 'warn' | 'done' | 'error',
 //  *     msg: string
 //  *   ) => void;
 //  *   i18n?:              (key: string, vars?: Record<string, string>) => string;

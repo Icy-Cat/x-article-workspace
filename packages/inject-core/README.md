@@ -28,19 +28,22 @@
 The pipeline is **pure** in the sense that it takes no global state — all I/O goes through an `InjectCoreAdapters` object passed in by the host:
 
 ```ts
+/**
+ * Discriminated union — `fetchImage` and `resolveLocalImage` share this shape.
+ * Used everywhere so the pipeline (and host code) never has to defend against
+ * a half-successful `ok: true` with missing base64/mime/fileName.
+ */
+type ImageResult =
+  | { ok: true;  base64: string; mime: string; fileName: string }
+  | { ok: false; error: string };
+
 interface InjectCoreAdapters {
   /**
    * Fetch a remote image URL. Host-defined because:
    *   - Extension: chrome.runtime.sendMessage to background fetch (CORS bypass)
    *   - Plugin: Obsidian requestUrl / Electron net.fetch (no CORS to begin with)
    */
-  fetchImage: (url: string) => Promise<{
-    ok: boolean;
-    base64?: string;
-    mime?: string;
-    fileName?: string;
-    error?: string;
-  }>;
+  fetchImage: (url: string) => Promise<ImageResult>;
 
   /**
    * Resolve a "local-path" image reference (e.g. `./img.png` in MD) to bytes.
@@ -49,20 +52,21 @@ interface InjectCoreAdapters {
    *   - Extension: File System Access API + persisted directory handle
    *   - Plugin: Obsidian vault.getResourcePath + file read
    */
-  resolveLocalImage?: (path: string) => Promise<{
-    ok: boolean;
-    base64?: string;
-    mime?: string;
-    fileName?: string;
-    error?: string;
-  }>;
+  resolveLocalImage?: (path: string) => Promise<ImageResult>;
 
   /**
    * Progress / status callback. Host renders its own UI for this — banner DOM
    * in extension, Obsidian Notice in plugin.
+   *
+   * Statuses:
+   *   - `idle`  no operation in progress, banner can clear
+   *   - `work`  in-flight operation, host shows working state
+   *   - `warn`  non-fatal warning (e.g. partial image failure), pipeline continues
+   *   - `done`  pipeline finished successfully (alignment with existing banner.js usage)
+   *   - `error` fatal failure, pipeline aborted
    */
   onProgress?: (
-    status: 'idle' | 'work' | 'warn' | 'error',
+    status: 'idle' | 'work' | 'warn' | 'done' | 'error',
     msg: string,
   ) => void;
 
