@@ -2,11 +2,13 @@
 
 | 字段 | 值 |
 |---|---|
-| Status | **Proposed**（待 @冷酷小猫 拍板） |
+| Status | **Superseded** by [ADR-0002](./0002-d4-injection-rework.md)（2026-05-16） |
 | Date | 2026-05-15 |
-| Author | @Coder（drafted），@冷酷小猫（待 accept） |
+| Author | @Coder（drafted），@Dev（reviewed） |
 | Supersedes | — |
-| Superseded by | — |
+| Superseded by | [ADR-0002](./0002-d4-injection-rework.md) |
+
+> **Note (2026-05-16)**：本 ADR 提出后，@冷酷小猫 在 review 过程中提出了更彻底的方向——把所有宿主（扩展 / skill / Obsidian 插件）的 X 编辑器注入逻辑统一到同一份共享代码上（"obsidian 插件改扩展同款实现"）。该方向衍生出 D1/D2/D3/D4 评估，最终 D4 胜出并落为 [ADR-0002](./0002-d4-injection-rework.md)。本 ADR 的 A/B/C 三选项框架已经被 ADR-0002 替代——A（delegate）的"行为契约"思路在 D4 里以**adapter pattern + 共享包**形式继续存在，但适用面从 skill 一个宿主扩展到全部宿主。**实施请直接参考 ADR-0002**。
 
 ---
 
