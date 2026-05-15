@@ -1,0 +1,36 @@
+{
+  "name": "@x-article/inject-core",
+  "version": "0.1.0",
+  "description": "Host-agnostic X article injection pipeline: Markdown parse → segments → Fiber-level injection + image upload + table rendering. Used by both the Chrome extension and the Obsidian plugin via adapter callbacks.",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./main/injector-main.js": "./src/main/injector-main.js",
+    "./vendor/parse-md.js": "./src/vendor/parse-md.js",
+    "./vendor/render-table.js": "./src/vendor/render-table.js",
+    "./content/detect.js": "./src/content/detect.js",
+    "./content/orchestrator-core.js": "./src/content/orchestrator-core.js",
+    "./content/segments-to-html.js": "./src/content/segments-to-html.js",
+    "./content/image-loader.js": "./src/content/image-loader.js",
+    "./content/file-import.js": "./src/content/file-import.js",
+    "./local-image/resolver.js": "./src/local-image/resolver.js"
+  },
+  "files": [
+    "src/**/*.js",
+    "README.md"
+  ],
+  "keywords": [
+    "x.com",
+    "twitter",
+    "article",
+    "markdown",
+    "fiber-injection"
+  ],
+  "scripts": {
+    "test": "echo \"TODO: wire up vitest with fixtures from docs/test-fixtures/\" && exit 0"
+  },
+  "author": "Icy-Cat",
+  "license": "MIT"
+}
