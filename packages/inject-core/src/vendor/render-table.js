@@ -4,6 +4,8 @@
 // Adapted for browser extension: extracted from the bridge.evalJS template
 // literal so it runs natively in the content script. Returns a base64 PNG.
 
+import { parseMarkdownInline } from "./parse-md.js";
+
 const MAX_TABLE_W = 1080;
 const PAD_X = 16;
 const PAD_Y = 14;
@@ -24,67 +26,142 @@ const BG = "#ffffff";
 const RADIUS = 12;
 const OUTER_PAD = 32;
 const COL_MIN_W = 80;
+const COLOR_LINK = "#1d9bf0";
+const COLOR_CODE_BG = "#eff3f4";
+const COLOR_CODE_TEXT = "#0f1419";
+const FONT_CODE =
+  `${Math.round(FONT_SIZE * 0.92)}px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`;
+
+export function inlineMarkdownSpansForTable(rawText) {
+  const parsed = parseMarkdownInline(rawText);
+  const text = parsed.text || "";
+  if (!text) return [{ text: "" }];
+  const styleAt = new Array(text.length).fill(null).map(() => ({
+    bold: false,
+    italic: false,
+    strike: false,
+    code: false,
+    href: "",
+  }));
+  const applyRange = (offset, length, patch) => {
+    const end = Math.min(text.length, offset + length);
+    for (let i = Math.max(0, offset); i < end; i++) {
+      Object.assign(styleAt[i], patch);
+    }
+  };
+  for (const r of parsed.inlineStyleRanges || []) {
+    if (r.style === "Bold") applyRange(r.offset, r.length, { bold: true });
+    else if (r.style === "Italic") applyRange(r.offset, r.length, { italic: true });
+    else if (r.style === "Strikethrough") applyRange(r.offset, r.length, { strike: true });
+    else if (r.style === "Code") applyRange(r.offset, r.length, { code: true });
+  }
+  for (const l of parsed.links || []) applyRange(l.offset, l.length, { href: l.url || "" });
+
+  const spans = [];
+  const push = (value, style = {}) => {
+    if (!value) return;
+    const last = spans[spans.length - 1];
+    if (
+      last &&
+      !!last.bold === !!style.bold &&
+      !!last.italic === !!style.italic &&
+      !!last.strike === !!style.strike &&
+      !!last.code === !!style.code &&
+      (last.href || "") === (style.href || "")
+    ) {
+      last.text += value;
+      return;
+    }
+    spans.push({ text: value, ...style });
+  };
+  for (let i = 0; i < text.length; i++) {
+    push(text[i], styleAt[i]);
+  }
+  return spans.length ? spans : [{ text: "" }];
+}
 
 export async function renderTableToImage(table, opts = {}) {
   const dpr = opts.dpr || 2;
   const fileName = opts.fileName || `table-${Date.now()}.png`;
 
   const meas = document.createElement("canvas").getContext("2d");
-  const measureLine = (text, font) => {
+  const spanFont = (span, baseFont, isHead) => {
+    if (span.code) return FONT_CODE;
+    const size = isHead ? HEAD_FONT_SIZE : FONT_SIZE;
+    const weight = isHead || span.bold ? "600 " : "";
+    const style = span.italic ? "italic " : "";
+    return `${style}${weight}${size}px ${FONT_FAMILY}`;
+  };
+  const spanColor = (span, baseColor) => {
+    if (span.href) return COLOR_LINK;
+    if (span.code) return COLOR_CODE_TEXT;
+    return baseColor;
+  };
+  const measureText = (text, font) => {
     meas.font = font;
     return meas.measureText(text).width;
   };
-  const wrapText = (text, maxW, font) => {
-    meas.font = font;
+  const measureSpans = (spans, baseFont, isHead) =>
+    spans.reduce((sum, span) => sum + measureText(span.text, spanFont(span, baseFont, isHead)), 0);
+  const pushWrappedChar = (lines, line, ch, span, baseFont, isHead, maxW) => {
+    const font = spanFont(span, baseFont, isHead);
+    const chW = measureText(ch, font);
+    const wouldOverflow = line.width + chW > maxW && line.spans.length > 0;
+    const target = wouldOverflow ? { spans: [], width: 0 } : line;
+    if (wouldOverflow) lines.push(target);
+    const last = target.spans[target.spans.length - 1];
+    if (
+      last &&
+      !!last.bold === !!span.bold &&
+      !!last.italic === !!span.italic &&
+      !!last.strike === !!span.strike &&
+      !!last.code === !!span.code &&
+      (last.href || "") === (span.href || "")
+    ) {
+      last.text += ch;
+    } else {
+      target.spans.push({ ...span, text: ch });
+    }
+    target.width += chW;
+    return target;
+  };
+  const wrapText = (text, maxW, baseFont, isHead = false) => {
     const lines = [];
     const explicitLines = String(text == null ? "" : text).split(/\r?\n|<br\s*\/?\s*>/i);
     for (const raw of explicitLines) {
       if (!raw) {
-        lines.push("");
+        lines.push({ spans: [{ text: "" }], width: 0 });
         continue;
       }
-      if (meas.measureText(raw).width <= maxW) {
-        lines.push(raw);
+      const spans = inlineMarkdownSpansForTable(raw);
+      const rawW = measureSpans(spans, baseFont, isHead);
+      if (rawW <= maxW) {
+        lines.push({ spans, width: rawW });
         continue;
       }
-      let cur = "";
-      let lastBreak = -1;
-      for (let i = 0; i < raw.length; i++) {
-        const ch = raw[i];
-        const tentative = cur + ch;
-        if (meas.measureText(tentative).width > maxW && cur.length > 0) {
-          if (lastBreak >= 0 && lastBreak < cur.length - 1) {
-            lines.push(cur.slice(0, lastBreak + 1).trimEnd());
-            cur = cur.slice(lastBreak + 1) + ch;
-            lastBreak = -1;
-          } else {
-            lines.push(cur);
-            cur = ch;
-          }
-        } else {
-          cur = tentative;
-          if (/[\s　、。,.!?;:，。！？；：、]/.test(ch)) {
-            lastBreak = cur.length - 1;
-          }
+      let line = { spans: [], width: 0 };
+      lines.push(line);
+      for (const span of spans) {
+        for (const ch of span.text) {
+          line = pushWrappedChar(lines, line, ch, span, baseFont, isHead, maxW);
         }
       }
-      if (cur) lines.push(cur);
     }
-    return lines.length ? lines : [""];
+    return lines.length ? lines : [{ spans: [{ text: "" }], width: 0 }];
   };
 
   const colCount = table.headers.length;
   const naturalContentW = new Array(colCount).fill(0);
-  const naturalize = (text, col, font) => {
+  const naturalize = (text, col, font, isHead) => {
     const lines = String(text == null ? "" : text).split(/\r?\n|<br\s*\/?\s*>/i);
     for (const ln of lines) {
-      const w = measureLine(ln, font);
+      const w = measureSpans(inlineMarkdownSpansForTable(ln), font, isHead);
       if (w > naturalContentW[col]) naturalContentW[col] = w;
     }
   };
-  table.headers.forEach((h, i) => naturalize(h, i, FONT_HEAD));
+  table.headers.forEach((h, i) => naturalize(h, i, FONT_HEAD, true));
   for (const row of table.rows) {
-    for (let i = 0; i < colCount; i++) naturalize(row[i] || "", i, FONT_BODY);
+    for (let i = 0; i < colCount; i++) naturalize(row[i] || "", i, FONT_BODY, false);
   }
 
   const padBudget = colCount * PAD_X * 2;
@@ -124,7 +201,7 @@ export async function renderTableToImage(table, opts = {}) {
     return maxLines * LINE_HEIGHT + basePad * 2;
   };
   const headerLines = table.headers.map((h, i) =>
-    wrapText(h, colWidths[i] - PAD_X * 2, FONT_HEAD),
+    wrapText(h, colWidths[i] - PAD_X * 2, FONT_HEAD, true),
   );
   const headerHeight = rowHeightFor(headerLines, HEAD_PAD_Y);
   rowLines.push({ kind: "head", cells: headerLines, height: headerHeight });
@@ -132,7 +209,7 @@ export async function renderTableToImage(table, opts = {}) {
     const cells = row
       .slice(0, colCount)
       .concat(new Array(Math.max(0, colCount - row.length)).fill(""))
-      .map((c, i) => wrapText(c, colWidths[i] - PAD_X * 2, FONT_BODY));
+      .map((c, i) => wrapText(c, colWidths[i] - PAD_X * 2, FONT_BODY, false));
     rowLines.push({ kind: "body", cells, height: rowHeightFor(cells, PAD_Y) });
   }
 
@@ -189,11 +266,32 @@ export async function renderTableToImage(table, opts = {}) {
     if (align === "right") return colX + colW - PAD_X - lineW;
     return colX + PAD_X;
   };
+  const drawLine = (line, x, y, baseFont, baseColor, isHead) => {
+    let xCur = x;
+    for (const span of line.spans) {
+      const font = spanFont(span, baseFont, isHead);
+      const width = measureText(span.text, font);
+      ctx.font = font;
+      ctx.fillStyle = spanColor(span, baseColor);
+      if (span.code) {
+        ctx.fillStyle = COLOR_CODE_BG;
+        ctx.fillRect(xCur - 3, y - 1, width + 6, LINE_HEIGHT - 4);
+        ctx.fillStyle = COLOR_CODE_TEXT;
+      }
+      ctx.fillText(span.text, xCur, y);
+      if (span.strike) {
+        ctx.strokeStyle = spanColor(span, baseColor);
+        ctx.beginPath();
+        ctx.moveTo(xCur, y + LINE_HEIGHT * 0.55);
+        ctx.lineTo(xCur + width, y + LINE_HEIGHT * 0.55);
+        ctx.stroke();
+      }
+      xCur += width;
+    }
+  };
   for (let r = 0; r < rowLines.length; r++) {
     const row = rowLines[r];
     const isHead = row.kind === "head";
-    ctx.font = isHead ? FONT_HEAD : FONT_BODY;
-    ctx.fillStyle = isHead ? COLOR_HEAD : COLOR_TEXT;
     let cx = tx;
     const padTop = isHead ? HEAD_PAD_Y : PAD_Y;
     for (let c = 0; c < colCount; c++) {
@@ -202,8 +300,14 @@ export async function renderTableToImage(table, opts = {}) {
       const align = table.alignments[c] || "left";
       let yLine = rowY[r] + padTop;
       for (const ln of lines) {
-        const lw = measureLine(ln, isHead ? FONT_HEAD : FONT_BODY);
-        ctx.fillText(ln, alignToX(align, cx, cw, lw), yLine);
+        drawLine(
+          ln,
+          alignToX(align, cx, cw, ln.width),
+          yLine,
+          isHead ? FONT_HEAD : FONT_BODY,
+          isHead ? COLOR_HEAD : COLOR_TEXT,
+          isHead,
+        );
         yLine += LINE_HEIGHT;
       }
       cx += cw;
