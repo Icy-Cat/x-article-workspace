@@ -55,7 +55,9 @@ export function inlineMarkdownSpansForTable(rawText) {
     else if (r.style === "Strikethrough") applyRange(r.offset, r.length, { strike: true });
     else if (r.style === "Code") applyRange(r.offset, r.length, { code: true });
   }
-  for (const l of parsed.links || []) applyRange(l.offset, l.length, { href: l.url || "" });
+  // Table output is a static PNG. Keep only the link display text from
+  // `[text](url)` and intentionally discard URL/link styling so the image
+  // does not suggest the text is clickable.
 
   const spans = [];
   const push = (value, style = {}) => {
