@@ -109,6 +109,16 @@ The MAIN-world Fiber script (`injector-main.js`) must be loaded into the X.com p
 1. **Chrome extension**: `content_scripts` entry with `"world": "MAIN"` (see x-article-md-paste manifest)
 2. **Obsidian plugin via bridge**: `page.evaluate(injectorMainSource)` — `injectorMainSource` is the contents of `node_modules/@x-article/inject-core/src/main/injector-main.js` read at runtime and stringified
 
+For hosts that ship without this workspace on the user's machine, run
+`pnpm -C packages/inject-core build` and vendor
+`packages/inject-core/dist/inject-core-runner.iife.js`. The bundle exposes
+`window.__xArticleInjectCore` with:
+
+- `installMain()` — installs the bundled MAIN-world Fiber injector once.
+- `runMarkdown({ markdown, imageMap, title, cover })` — parses Markdown and runs the shared pipeline.
+- `runParsed({ parsed, adapters })` — lower-level entry when the host already parsed or wants custom adapters.
+- `createMappedImageAdapters(imageMap)` — adapter helper for Playwright hosts that pre-resolve vault/remote images before `browser_evaluate`.
+
 ## Layout
 
 ```

@@ -7,6 +7,8 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
+    "./browser/runner.js": "./src/browser/runner.js",
+    "./dist/inject-core-runner.iife.js": "./dist/inject-core-runner.iife.js",
     "./main/injector-main.js": "./src/main/injector-main.js",
     "./vendor/parse-md.js": "./src/vendor/parse-md.js",
     "./vendor/render-table.js": "./src/vendor/render-table.js",
@@ -19,6 +21,7 @@
   },
   "files": [
     "src/**/*.js",
+    "dist/**/*.js",
     "README.md"
   ],
   "keywords": [
@@ -29,7 +32,8 @@
     "fiber-injection"
   ],
   "scripts": {
-    "test": "echo \"TODO: wire up vitest with fixtures from docs/test-fixtures/\" && exit 0"
+    "build": "node scripts/build-browser-bundle.mjs",
+    "test": "node --test \"tests/**/*.test.js\""
   },
   "author": "Icy-Cat",
   "license": "MIT"

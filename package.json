@@ -5,6 +5,8 @@
   "scripts": {
     "build": "pnpm -C apps/vscode build",
     "build:vscode": "pnpm -C apps/vscode build",
+    "build:inject-core": "pnpm -C packages/inject-core build",
+    "test:inject-core": "pnpm -C packages/inject-core test",
     "lint": "pnpm -C apps/vscode lint"
   },
   "devDependencies": {
