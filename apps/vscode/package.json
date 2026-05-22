@@ -16,6 +16,7 @@
   "categories": ["Other"],
   "activationEvents": [
     "onCommand:xArticle.openPreview",
+    "onCommand:xArticle.publishViaInjectCoreMcp",
     "onView:xArticle.preview"
   ],
   "contributes": {
@@ -24,6 +25,7 @@
       { "command": "xArticle.refreshPreview", "title": "X Article: Refresh Preview" },
       { "command": "xArticle.copyPublishScript", "title": "X Article: Copy Publish Script" },
       { "command": "xArticle.publishViaMcp", "title": "X Article: Publish Through Browser" },
+      { "command": "xArticle.publishViaInjectCoreMcp", "title": "X Article: Upload Local Markdown via Inject Core" },
       { "command": "xArticle.openGuide", "title": "X Article: Open Quick Start Guide" }
     ],
     "viewsContainers": {

@@ -4,6 +4,7 @@ import { buildBrowserPublishFunction, buildBrowserPublishScript, publishViaDetec
 import { buildPreviewHtml } from "./previewHtml";
 import { buildPublishPayload, buildRenderedPreview } from "./payload";
 import { openGuide } from "./guide";
+import { publishActiveDocumentWithInjectCore } from "./injectCorePublish";
 import { PublishLogger } from "./logger";
 import { getSettings } from "./settings";
 
@@ -103,6 +104,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("xArticle.publishViaMcp", async () => {
       await publishActiveDocument(context);
     }),
+    vscode.commands.registerCommand("xArticle.publishViaInjectCoreMcp", async () => {
+      await publishActiveDocumentViaInjectCore(context);
+    }),
     vscode.commands.registerCommand("xArticle.openGuide", () => {
       openGuide(context);
     }),
@@ -128,6 +132,29 @@ export function activate(context: vscode.ExtensionContext): void {
 
   if (getSettings().showWelcomeGuide && !context.globalState.get("xArticle.hasShownGuide")) {
     openGuide(context);
+  }
+}
+
+async function publishActiveDocumentViaInjectCore(context: vscode.ExtensionContext): Promise<void> {
+  const document = getActiveMarkdownDocument();
+  if (!document) {
+    void vscode.window.showErrorMessage("Open a Markdown note first.");
+    return;
+  }
+
+  try {
+    const settings = getSettings();
+    const logger = new PublishLogger(context, settings.enableDebugLog);
+    const result = await publishActiveDocumentWithInjectCore(
+      context,
+      document,
+      settings,
+      (event, details) => logger.append(event, details)
+    );
+    void vscode.window.showInformationMessage(`Published to X through inject-core (${result.source}).`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Publishing through inject-core failed.";
+    void vscode.window.showErrorMessage(message);
   }
 }
 

@@ -12,10 +12,19 @@ If a local Claude skill directory is used as a compatibility wrapper, keep imple
 Upload a local Markdown file to X (Twitter) article draft editor in one shot:
 detect token → spawn playwright MCP via npx → navigate → inject content — no manual steps.
 
+The preferred path is the inject-core runner, which reuses the same Markdown
+import pipeline as x-article-md-paste:
+
+```bash
+node "<SKILL_DIR>/scripts/upload-article-inject-core.mjs" "<absolute-path-to-file.md>"
+```
+
+The older `scripts/upload-article.mjs` remains available for compatibility.
+
 ## Usage
 
 ```bash
-node "<SKILL_DIR>/scripts/upload-article.mjs" "<absolute-path-to-file.md>"
+node "<SKILL_DIR>/scripts/upload-article-inject-core.mjs" "<absolute-path-to-file.md>"
 ```
 
 Replace `<SKILL_DIR>` with the actual path to this skill's directory.
@@ -117,7 +126,8 @@ x-article-upload/
 ├── SKILL.md                         ← You are here
 ├── .env                             ← Token cache (auto-created, gitignored)
 └── scripts/
-    ├── upload-article.mjs           ← Main end-to-end script (use this)
+    ├── upload-article-inject-core.mjs ← Main inject-core end-to-end script (use this)
+    ├── upload-article.mjs           ← Legacy menu/api upload script
     ├── detect-playwright-token.mjs  ← Token detection only (for debugging)
     └── process-md.mjs               ← Markdown processing only (for debugging)
 ```
