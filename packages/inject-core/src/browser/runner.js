@@ -7,7 +7,7 @@
 import { runPipeline, parseMarkdownText } from '../index.js';
 
 const GLOBAL_NAME = '__xArticleInjectCore';
-const MAIN_INSTALLED_FLAG = '__xArticleInjectCoreMainInstalled';
+const MAIN_INSTALLED_FLAG = '__xArticleInjectCoreMainInstalled_v2';
 const INJECTOR_MAIN_SOURCE = __INJECTOR_MAIN_SOURCE__;
 const VERSION = __INJECT_CORE_VERSION__;
 

@@ -22,6 +22,7 @@ const MCP_REQUEST_TIMEOUT_MS = 10_000;
 const MCP_EVALUATE_TIMEOUT_MS = 180_000;
 const IMAGE_FETCH_CONCURRENCY = 4;
 
+async function main() {
 const args = argv.slice(2);
 const filePath = args.find((arg, index) => !arg.startsWith('-') && args[index - 1] !== '--token');
 const tokenIdx = args.indexOf('--token');
@@ -73,6 +74,7 @@ try {
   console.log('✅ Article uploaded through inject-core.');
 } finally {
   await client.close();
+}
 }
 
 function detectToken() {
@@ -241,7 +243,7 @@ function buildInjectCoreEvaluateFunction(bundle, markdownSource, imageMap) {
     const runnerSource = ${JSON.stringify(bundle)};
     const markdown = ${JSON.stringify(markdownSource)};
     const imageMap = ${JSON.stringify(imageMap)};
-    if (!window.__xArticleInjectCore) (0, eval)(runnerSource);
+    (0, eval)(runnerSource);
     const api = window.__xArticleInjectCore;
     if (!api || typeof api.runMarkdown !== 'function') throw new Error('inject-core runner did not install.');
     return api.runMarkdown({ markdown, imageMap });
@@ -402,3 +404,5 @@ function parseToolResult(result) {
     return sliced;
   }
 }
+
+await main();

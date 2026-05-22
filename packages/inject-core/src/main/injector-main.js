@@ -18,8 +18,8 @@
 
 (function () {
   const TAG = '[XMP-MAIN]';
-  const SOURCE_OUT = 'xmp-main';
-  const SOURCE_IN = 'xmp';
+  const SOURCE_OUT = typeof __X_ARTICLE_SOURCE_IN__ !== 'undefined' ? __X_ARTICLE_SOURCE_IN__ : 'xmp-main';
+  const SOURCE_IN = typeof __X_ARTICLE_SOURCE_OUT__ !== 'undefined' ? __X_ARTICLE_SOURCE_OUT__ : 'xmp';
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,6 +102,11 @@
     return key;
   }
 
+  function getFirstCharacterMetadata(block) {
+    const list = block?.getCharacterList?.();
+    return list?.get?.(0) || list?.first?.() || list?.toArray?.()?.[0] || null;
+  }
+
   // Apply ONE marker→atomic replacement to a contentState, returning the
   // new contentState. Doesn't call onChange — caller batches.
   function applyAtomicToCS(cs, marker, entityType, entityData, mutability, sampleCharSrc, listCtor) {
@@ -118,8 +123,7 @@
 
     const target = blockMap.get(targetKey);
     const sampleAtomic = blockMap.find((b) => b.getType() === 'atomic') || sampleCharSrc;
-    const charList = sampleAtomic ? sampleAtomic.getCharacterList() : target.getCharacterList();
-    const charSample = charList.get(0);
+    const charSample = getFirstCharacterMetadata(sampleAtomic || target);
     if (!charSample?.set) return { ok: false, err: 'no charSample', cs };
 
     const cs1 = cs.createEntity(entityType, mutability, entityData);
@@ -149,7 +153,7 @@
     const initialBlockMap = cs.getBlockMap();
     const sampleAtomic = initialBlockMap.find((b) => b.getType() === 'atomic');
     // Need a character-list constructor — sample from any block with chars
-    const sampleCharBlock = sampleAtomic || initialBlockMap.find((b) => b.getCharacterList().get(0));
+    const sampleCharBlock = sampleAtomic || initialBlockMap.find((b) => getFirstCharacterMetadata(b));
     if (!sampleCharBlock) {
       return { okCount: 0, failCount: atomicSteps.length, errs: ['no sample character block'] };
     }

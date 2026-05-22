@@ -25,8 +25,8 @@ import { createImageLoader } from './image-loader.js';
 import { renderTableToImage } from '../vendor/render-table.js';
 import { isLocalPath } from '../local-image/resolver.js';
 
-const SOURCE_OUT = 'xmp';
-const SOURCE_IN = 'xmp-main';
+const SOURCE_OUT = typeof __X_ARTICLE_SOURCE_OUT__ !== 'undefined' ? __X_ARTICLE_SOURCE_OUT__ : 'xmp';
+const SOURCE_IN = typeof __X_ARTICLE_SOURCE_IN__ !== 'undefined' ? __X_ARTICLE_SOURCE_IN__ : 'xmp-main';
 
 // Inactivity timeout — reset every time the MAIN world posts a 'progress'
 // message. Long articles with X media-pipeline stalls can take 1m+ per
@@ -213,6 +213,11 @@ export async function runPipeline({ parsed, adapters }) {
 
   progress('work', tr('arranging'));
   const payload = buildPastePayload(segments, { imageMap, tableMap, i18n });
+  // The browser runner is commonly used on machines where the XMP browser
+  // extension is also installed. Keep the clipboard text/plain fallback
+  // marker-only so extension paste listeners don't re-parse our original
+  // Markdown and replace the run with their own XMP/XPOSTER marker flow.
+  payload.plain = payload.html.replace(/<[^>]*>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   // Carry title/cover hints to MAIN. Cover is matched against body images
   // by source URL there; if the cover URL matches an uploaded body image,
   // we reuse its mediaId — no separate upload needed.

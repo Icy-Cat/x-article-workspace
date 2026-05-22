@@ -10,6 +10,15 @@ const workspaceRoot = resolve(root, '../..');
 const esbuild = await import(pathToFileURL(resolveEsbuild()).href);
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const injectorMainSource = readFileSync(resolve(root, 'src/main/injector-main.js'), 'utf8');
+const runnerInjectorMainSource = injectorMainSource
+  .replace(
+    "const SOURCE_OUT = typeof __X_ARTICLE_SOURCE_IN__ !== 'undefined' ? __X_ARTICLE_SOURCE_IN__ : 'xmp-main';",
+    "const SOURCE_OUT = 'x-article-inject-core-main';",
+  )
+  .replace(
+    "const SOURCE_IN = typeof __X_ARTICLE_SOURCE_OUT__ !== 'undefined' ? __X_ARTICLE_SOURCE_OUT__ : 'xmp';",
+    "const SOURCE_IN = 'x-article-inject-core';",
+  );
 const outdir = resolve(root, 'dist');
 const outfile = resolve(outdir, 'inject-core-runner.iife.js');
 
@@ -25,8 +34,10 @@ await esbuild.build({
   minify: false,
   legalComments: 'none',
   define: {
-    __INJECTOR_MAIN_SOURCE__: JSON.stringify(injectorMainSource),
+    __INJECTOR_MAIN_SOURCE__: JSON.stringify(runnerInjectorMainSource),
     __INJECT_CORE_VERSION__: JSON.stringify(pkg.version),
+    __X_ARTICLE_SOURCE_OUT__: JSON.stringify('x-article-inject-core'),
+    __X_ARTICLE_SOURCE_IN__: JSON.stringify('x-article-inject-core-main'),
   },
 });
 

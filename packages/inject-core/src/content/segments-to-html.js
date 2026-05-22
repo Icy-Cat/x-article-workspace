@@ -45,7 +45,7 @@ const TEXT_KIND_TO_BLOCK = {
 export function buildPastePayload(segments, { imageMap, tableMap, sessionId, i18n } = {}) {
   const tr = typeof i18n === 'function' ? i18n : defaultI18n;
   const sid = sessionId || Math.random().toString(36).slice(2, 6);
-  const markerPrefix = `__XMP_${sid}_`;
+  const markerPrefix = `__XARTICLE_${sid}_`;
   const plan = [];
 
   let nextIdx = 0;
