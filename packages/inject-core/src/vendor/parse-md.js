@@ -51,7 +51,10 @@ export function parseMarkdownText(raw) {
     const firstH1Idx = out.findIndex((s) => s.type === "text" && s.kind === "header-one");
     if (firstH1Idx >= 0) {
       title = out[firstH1Idx].text || null;
-      if (title) out.splice(firstH1Idx, 1);
+      if (title) {
+        out.splice(firstH1Idx, 1);
+        downgradeBodyHeadings(out);
+      }
     }
   }
 
@@ -225,6 +228,21 @@ function textChunkToSegments(chunk) {
   }
   flushPara();
   return segs;
+}
+
+const HEADING_DOWNGRADE = {
+  "header-two": "header-one",
+  "header-three": "header-two",
+  "header-four": "header-three",
+  "header-five": "header-four",
+  "header-six": "header-five",
+};
+
+function downgradeBodyHeadings(segments) {
+  for (const seg of segments) {
+    if (seg?.type !== "text") continue;
+    if (HEADING_DOWNGRADE[seg.kind]) seg.kind = HEADING_DOWNGRADE[seg.kind];
+  }
 }
 
 export function parseMarkdownInline(rawText) {

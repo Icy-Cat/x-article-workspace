@@ -263,6 +263,17 @@ const CREATE_OR_FIND_EDITOR_FUNCTION = `async () => {
     return document.querySelector("[data-contents='true'] [contenteditable='true']")
       || document.querySelector("[contenteditable='true']");
   }
+  async function ensureArticleListPage() {
+    if (!/\/compose\/articles\/edit\//.test(location.pathname)) return;
+    history.pushState({}, '', '/compose/articles');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (!/\/compose\/articles\/edit\//.test(location.pathname)) return;
+      await sleep(100);
+    }
+    location.href = 'https://x.com/compose/articles';
+    await sleep(1500);
+  }
   function findCreateButton() {
     const ariaTerms = new Set([
       'create','compose','write','draft','new article','撰写','新建','创建',
@@ -281,7 +292,7 @@ const CREATE_OR_FIND_EDITOR_FUNCTION = `async () => {
     }
     return null;
   }
-  if (findEditor()) return true;
+  await ensureArticleListPage();
   const button = findCreateButton();
   if (!button) throw new Error('Create button not found.');
   button.click();
