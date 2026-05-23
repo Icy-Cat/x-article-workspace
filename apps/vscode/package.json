@@ -1,7 +1,7 @@
 {
   "name": "x-article-vscode",
   "displayName": "X Article in VS Code",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Preview the current Markdown document in an X Article-style sidebar and publish it through Playwright MCP.",
   "license": "MIT",
