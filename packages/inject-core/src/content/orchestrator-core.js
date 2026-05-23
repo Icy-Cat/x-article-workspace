@@ -41,6 +41,7 @@ const PROGRESS_TIMEOUT_MS = 60000;
 // probe will resolve it).
 let mainReady = false;
 let mainReadyPromise = null;
+let mainNonce = '';
 function ensureMainReadyListener() {
   if (mainReadyPromise) return mainReadyPromise;
   mainReadyPromise = new Promise((resolve) => {
@@ -49,6 +50,7 @@ function ensureMainReadyListener() {
       if (ev.data?.source !== SOURCE_IN) return;
       if (ev.data.kind === 'ready') {
         mainReady = true;
+        mainNonce = ev.data.nonce || '';
         window.removeEventListener('message', onReady);
         resolve();
       }
@@ -79,6 +81,7 @@ function postRun(payload, { onProgress, i18n }) {
       if (ev.source !== window) return;
       const d = ev.data;
       if (!d || d.source !== SOURCE_IN) return;
+      if (mainNonce && d.nonce !== mainNonce) return;
       if (d.kind === 'progress') {
         // MAIN sends an i18n key + vars. Translate here using the host's
         // i18n adapter (no host i18n → falls back to the i18n function's
@@ -109,7 +112,7 @@ function postRun(payload, { onProgress, i18n }) {
       }
     };
     window.addEventListener('message', onMsg);
-    window.postMessage({ source: SOURCE_OUT, kind: 'run', payload }, '*');
+    window.postMessage({ source: SOURCE_OUT, kind: 'run', nonce: mainNonce, payload }, '*');
   });
 }
 

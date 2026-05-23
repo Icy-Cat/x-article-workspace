@@ -193,7 +193,9 @@ export function renderInline(seg) {
     closes[r.offset + r.length].push(tag);
   }
   for (const l of links) {
-    opens[l.offset].push({ tag: 'a', href: l.url });
+    const href = sanitizeHref(l.url);
+    if (!href) continue;
+    opens[l.offset].push({ tag: 'a', href });
     closes[l.offset + l.length].push('a');
   }
   let out = '';
@@ -206,6 +208,18 @@ export function renderInline(seg) {
     if (i < text.length) out += escapeText(text[i]);
   }
   return out;
+}
+
+export function sanitizeHref(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (['https:', 'http:', 'mailto:'].includes(parsed.protocol)) return raw;
+  } catch {
+    return '';
+  }
+  return '';
 }
 
 export function escapeText(s) {

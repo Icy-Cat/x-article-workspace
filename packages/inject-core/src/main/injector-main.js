@@ -5,8 +5,8 @@
 //
 // Wire-protocol:
 //   bridge → main:  { source: 'xmp', kind: 'ready?' }
-//                   { source: 'xmp', kind: 'run', payload: {html, plain, plan, sessionId} }
-//   main   → bridge:{ source: 'xmp-main', kind: 'ready' }
+//                   { source: 'xmp', kind: 'run', nonce, payload: {html, plain, plan, sessionId} }
+//   main   → bridge:{ source: 'xmp-main', kind: 'ready', nonce }
 //                   { source: 'xmp-main', kind: 'progress', text, level }
 //                   { source: 'xmp-main', kind: 'done', summary }
 //                   { source: 'xmp-main', kind: 'error', error }
@@ -20,11 +20,15 @@
   const TAG = '[XMP-MAIN]';
   const SOURCE_OUT = typeof __X_ARTICLE_SOURCE_IN__ !== 'undefined' ? __X_ARTICLE_SOURCE_IN__ : 'xmp-main';
   const SOURCE_IN = typeof __X_ARTICLE_SOURCE_OUT__ !== 'undefined' ? __X_ARTICLE_SOURCE_OUT__ : 'xmp';
+  const SESSION_NONCE =
+    (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+      ? globalThis.crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const post = (kind, extra = {}) => {
-    window.postMessage({ source: SOURCE_OUT, kind, ...extra }, '*');
+    window.postMessage({ source: SOURCE_OUT, kind, nonce: SESSION_NONCE, ...extra }, '*');
   };
   // Progress messages cross worlds. We send an i18n key + vars; the
   // orchestrator (isolated world) holds the translation table and feeds
@@ -1100,6 +1104,7 @@
       post('ready');
       return;
     }
+    if (data.nonce !== SESSION_NONCE) return;
     if (data.kind === 'run') {
       runFlow(data.payload).catch((err) => {
         console.error(TAG, 'runFlow crashed', err);

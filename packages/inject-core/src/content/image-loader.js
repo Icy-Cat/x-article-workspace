@@ -140,6 +140,9 @@ function parseDataUri(source) {
   const m = DATA_URI_RE.exec(source);
   if (!m) return { ok: false, error: 'malformed data: URI' };
   const mime = (m[1] || 'image/png').toLowerCase();
+  if (!isAllowedImageMime(mime)) {
+    return { ok: false, error: `unsupported image MIME: ${mime}` };
+  }
   const isB64 = !!m[2];
   const payload = m[3] || '';
   if (!payload) return { ok: false, error: 'empty data: URI payload' };
@@ -186,12 +189,30 @@ export function normalizeImageResult(r, adapterName) {
   if (typeof r.mime !== 'string' || !r.mime) {
     throw new Error(`${adapterName}: ok:true result missing mime`);
   }
+  if (!isAllowedImageMime(r.mime)) {
+    throw new Error(`${adapterName}: unsupported image MIME: ${r.mime}`);
+  }
   return {
     ok: true,
     base64: r.base64,
     mime: r.mime,
     fileName: typeof r.fileName === 'string' ? r.fileName : undefined,
   };
+}
+
+function isAllowedImageMime(mime) {
+  switch ((mime || '').toLowerCase()) {
+    case 'image/png':
+    case 'image/jpeg':
+    case 'image/jpg':
+    case 'image/gif':
+    case 'image/webp':
+    case 'image/bmp':
+    case 'image/avif':
+      return true;
+    default:
+      return false;
+  }
 }
 
 function deriveFileName(source) {
@@ -221,8 +242,6 @@ function mimeToExt(mime) {
       return 'gif';
     case 'image/webp':
       return 'webp';
-    case 'image/svg+xml':
-      return 'svg';
     default:
       return 'png';
   }
